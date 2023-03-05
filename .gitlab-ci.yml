@@ -1,0 +1,14 @@
+image: docker:latest  # this sets default image for jobs
+services:
+  - docker:dind
+
+REPLACE_BY_BY_THE_NAME_build:
+  stage: build
+  only:
+    changes:
+      - "REPLACE_BY_BY_THE_NAME/**/*"
+  script:
+    - cd REPLACE_BY_BY_THE_NAME
+    - docker build -t micros_REPLACE_BY_BY_THE_NAME -f Dockerfile --tag latest .
+    - docker stack deploy --compose-file docker-compose.yml micros_REPLACE_BY_BY_THE_NAME
+    

@@ -1,0 +1,10 @@
+{
+  "http": {
+    "method": "GET",
+    "pathname": "/users",
+    "authentication": {
+      "type": "bearer",
+      "requirement": "required"
+    }
+  }
+}
