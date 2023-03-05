@@ -1,4 +1,4 @@
-# Microservice Tempalte
+# Microservice Template
 
 ```
 const _ = require('./_');
