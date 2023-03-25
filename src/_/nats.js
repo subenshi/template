@@ -220,9 +220,6 @@ module.exports.close = async () => {
   if (nc) {
     try {
       const doNotWaitForInflight = env.get('INFLIGHT_DO_NOT_WAIT_ON_EXIT')
-
-      console.log({doNotWaitForInflight})
-
       if (!doNotWaitForInflight && inflightCount) {
         // Check every 500ms if there are inflight messages
         await new Promise((resolve) => {
