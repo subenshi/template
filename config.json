@@ -1,10 +1,64 @@
 {
-  "http": {
-    "method": "GET",
-    "pathname": "/users",
-    "authentication": {
-      "type": "bearer",
-      "requirement": "required"
+  "http": [
+    {
+      "method": "GET",
+      "pathname": "/notes",
+      "routerId": "getAll"
+    },
+    {
+      "method": "GET",
+      "pathname": "/notes/:_id",
+      "routerId": "getOne"
+    },
+    {
+      "method": "POST",
+      "pathname": "/notes",
+      "routerId": "create",
+      "validate": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "contactId": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "contactId", "date", "text"
+          ]
+        }
+      }
+    },
+    {
+      "method": "PUT",
+      "pathname": "/notes/:_id",
+      "routerId": "update",
+      "validate": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "DELETE",
+      "pathname": "/notes/:_id",
+      "routerId": "delete"
     }
-  }
+  ]
 }

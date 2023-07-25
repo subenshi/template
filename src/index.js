@@ -4,33 +4,33 @@ const _ = require('./_');
 // MongoDB, etc. depending on the availability of its environment variables
 _.connect(() => {
   // Receive a message via NATS from the gateway or another microservice
-  _.receive(async (m, message) => {
-    const { url, method, query, body, headers, user } = message.payload
+  _.receive(async (m, originalMessage) => {
+    const { operation } = originalMessage;
 
-    _.db()
-      .insertOne({
-        text: `Request processed`
-      })
-      .then(insert => {
-        const response = {
-          code: 200,
-          data: { hello_world: `${query.name} ${insert.insertedId}`, url, method, query, body, headers, user },
-        }
-
-        // Sends the response to the gateway or another microservice
-        _.reply(m, response)
-      })
-      .catch(e => {
-        console.error(e);
-      })
-  })
+    // If the microservice is invoked by the gateway, then the message
+    // must be routed to the router.js file methods.
+    if (originalMessage.application.from === 'gateway') {
+      const { routerId } = originalMessage.original;
+      _.router(routerId, m, originalMessage)
+      return;
+    }
   
-  // Runs a command in the database:
-  // _.db().insertMany([{a:1},{b:2}]);
-
-  // Send a message to another microservice, without expecting a response
-  // _.send( {a:'Hello World!'} )
-
-  // Send a message to another microservice, and expect a response (promise)
-  // _.request(message.service, message, { timeout: 5000 })
+    // The microservice is invoked by another microservice, so the message
+    // must be routed to the services.js file methods.
+    const op = _.services[operation]
+    
+    // Fail if the method is not found
+    if (!op) {
+      return _.replyError(m, { error: `Operation ${operation} not found` })
+    };
+  
+    // Execute the operation
+    try {
+      const r = await op(originalMessage.payload)
+      _.reply(m, r)
+    }
+    catch (err) {
+      _.replyError(m, err)
+    }
+  })
 });

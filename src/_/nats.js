@@ -79,27 +79,67 @@ module.exports.normalizeReplyOptions = (opts) => {
  * Replies to a NATS message
  * 
  * @param {Object} message Original message from NATS
- * @param {Object} body 
- * @param {Boolean} body.isError Indicates if the response is an error
- * @param {Number} body.code HTTP status code
- * @param {Object} body.data Data to be sent back to the requester
+ * @param {Object} payload Data to be sent back to the requester
+ * @param {Object} properties
+ * @param {Number} properties.statusCode HTTP status code
  * @param {Object} opts
  * @param {Number} opts.timeout Timeout in milliseconds
  * @returns {Boolean} true if a reply was sent to a reply subject
  */
-module.exports.reply = (m, body, opts) => {
+module.exports.reply = (m, payload, properties, opts) => {
+  if (!properties) properties = {};
   // Normalize opts
   opts = this.normalizeReplyOptions(opts);
 
   const originalMessage = JSONCodec().decode(m.data);
   let natsMesssage = {
+    isOk: true,
     uuid: crypto.uuid(),
     timestamp: new Date().toISOString(),
     application: {
       from: package.name,
       to: originalMessage.application.from,
     },
-    payload: body,
+    payload,
+    properties,
+    original: originalMessage.original,
+  };
+
+  if (opts.delay) {
+    setTimeout(() => {
+      this.replyExec(m, {a:1});
+    }, opts.delay);
+  }
+  else {
+    this.replyExec(m, natsMesssage);
+  }
+}
+
+module.exports.replyError = (m, payload, properties, opts) => {
+  if (!properties) properties = {};
+  if (!properties.statusCode) properties.statusCode = 500;
+  // Normalize opts
+  opts = this.normalizeReplyOptions(opts);
+
+  const originalMessage = JSONCodec().decode(m.data);
+
+  if (payload instanceof Error) {
+    payload = {
+      message: payload.message,
+      stack: payload.stack,
+    }
+  }
+
+  let natsMesssage = {
+    isOk: false,
+    uuid: crypto.uuid(),
+    timestamp: new Date().toISOString(),
+    application: {
+      from: package.name,
+      to: originalMessage.application.from,
+    },
+    payload,
+    properties,
     original: originalMessage.original,
   };
 
@@ -111,12 +151,12 @@ module.exports.reply = (m, body, opts) => {
   else {
     this.replyExec(m, natsMesssage);
   }
-}
+};
 
 module.exports.replyExec = (m, body) => {
   try {
     const sc = JSONCodec();
-    m.respond(sc.encode(body));
+    m.respond(sc.encode(body || {}));
   }
   catch (err) {
     console.error(err)
@@ -173,7 +213,7 @@ module.exports.receive = messageCallback => {
   })
 };
 
-module.exports.request = async (topic, message, opts) => {
+module.exports.request = async (m, topic, operation, payload, opts) => {
   if (!nc) {
     throw new Error('NATS connection not initialized');
   };
@@ -181,23 +221,28 @@ module.exports.request = async (topic, message, opts) => {
   if (!opts) opts = { timeout: 5000 };
   const sc = JSONCodec();
 
-  message.uuid = crypto.uuid();
-  message.timestamp = new Date().toISOString();
-  message.application.from = package.name;
+  const originalMessage = JSONCodec().decode(m.data);
+  let message = {
+    operation,
+    payload,
+    uuid: crypto.uuid(),
+    timestamp: new Date().toISOString(),
+    application: {
+      from: package.name,
+      to: topic
+    },
+    original: originalMessage.original,
+  }
 
   return nc.request(topic, sc.encode(message), { timeout: opts.timeout })
     .then((response) => {
-      return sc.decode(response.data)
+      const m = sc.decode(response.data);
+      if (!m.isOk) throw m;
+      return m.payload;
     })
-    .catch((err) => {
-      message.application.to = package.name;
-      message.error = {
-        code: err.code === 'TIMEOUT' ? 408 : 505,
-        data: {
-          error: err.code === 'TIMEOUT' ? 'Request timed out' : 'Server error',
-        }
-      };
-      throw message;
+    .catch((m) => {
+      message.payload = m.payload;
+      throw m.payload;
     });
 }
 

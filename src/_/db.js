@@ -2,12 +2,17 @@ const mongodb = require('mongodb');
 
 const env = require('./env');
 const log = require('./log');
+const package = require('./package');
 
 let db;
 let client;
 
 const mongodbConnectionString = env.get('MONGODB_CONNECTION_STRING');
 const mongodbDatabase = env.get('MONGODB_DATABASE');
+
+module.exports._id = (id) => {
+  return new mongodb.ObjectId(id);
+}
 
 module.exports.connect = async () => {
   if (!mongodbConnectionString) {
@@ -39,7 +44,7 @@ module.exports.connect = async () => {
 
 module.exports.db = (collection) => {
   if (!db) throw new Error('MongoDB is not connected');
-  if (!collection) collection = env.get('MONGODB_COLLECTION');
+  if (!collection) collection = package.name || env.get('MONGODB_COLLECTION');
   if (!collection) throw new Error('MONGODB_COLLECTION is not set');
   return db.collection(collection);
 }
